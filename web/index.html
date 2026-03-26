@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>10Editor — Edição de Vídeo com IA · by 10mais</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --yellow: #ffc00f;
+      --yellow-dim: rgba(255,192,15,0.10);
+      --yellow-glow: rgba(255,192,15,0.22);
+      --charcoal: #14141a;
+      --charcoal-2: #1a1a22;
+      --charcoal-3: #22222e;
+      --charcoal-border: rgba(255,255,255,0.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #07070e;
+      color: #e2e2ea;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ════════════════════════════════
+       GALAXY BACKGROUND
+    ════════════════════════════════ */
+    #galaxy-canvas {
+      position: fixed; inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Deep nebula layers — rich & mysterious */
+    .nb {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      will-change: transform;
+    }
+    .nb-1 {
+      width: 900px; height: 700px;
+      background: radial-gradient(ellipse at center,
+        rgba(80,20,160,0.18) 0%,
+        rgba(40,10,100,0.10) 40%,
+        transparent 70%);
+      filter: blur(80px);
+      top: -250px; left: -200px;
+      animation: nbDrift 25s ease-in-out infinite alternate;
+    }
+    .nb-2 {
+      width: 700px; height: 800px;
+      background: radial-gradient(ellipse at center,
+        rgba(255,192,15,0.07) 0%,
+        rgba(200,100,0,0.05) 40%,
+        transparent 70%);
+      filter: blur(90px);
+      top: 10%; right: -200px;
+      animation: nbDrift 30s ease-in-out infinite alternate-reverse;
+    }
+    .nb-3 {
+      width: 800px; height: 600px;
+      background: radial-gradient(ellipse at center,
+        rgba(0,80,200,0.10) 0%,
+        rgba(0,40,120,0.06) 40%,
+        transparent 70%);
+      filter: blur(100px);
+      bottom: -100px; left: 20%;
+      animation: nbDrift 35s ease-in-out infinite alternate;
+    }
+    .nb-4 {
+      width: 500px; height: 500px;
+      background: radial-gradient(ellipse at center,
+        rgba(160,0,80,0.08) 0%,
+        transparent 65%);
+      filter: blur(70px);
+      bottom: 20%; right: 5%;
+      animation: nbDrift 20s ease-in-out infinite alternate-reverse;
+    }
+    @keyframes nbDrift {
+      from { transform: translate(0px, 0px) scale(1); }
+      to   { transform: translate(40px, 30px) scale(1.12); }
+    }
+
+    /* ════════════════════════════════
+       LAYOUT
+    ════════════════════════════════ */
+    .content { position: relative; z-index: 1; }
+
+    /* Header */
+    .header-bar {
+      border-bottom: 1px solid var(--charcoal-border);
+      backdrop-filter: blur(24px);
+      background: rgba(7,7,14,0.75);
+      position: sticky; top: 0; z-index: 50;
+    }
+
+    /* Cards */
+    .card {
+      background: rgba(20,20,28,0.75);
+      border: 1px solid var(--charcoal-border);
+      border-radius: 20px;
+      backdrop-filter: blur(12px);
+    }
+    .card-glow {
+      box-shadow: 0 0 50px rgba(255,192,15,0.12), inset 0 1px 0 rgba(255,255,255,0.04);
+      border-color: rgba(255,192,15,0.18);
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 1px dashed rgba(255,192,15,0.25);
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.25s;
+      background: rgba(255,192,15,0.02);
+    }
+    .drop-zone:hover, .drop-zone.dragging {
+      border-color: var(--yellow);
+      background: rgba(255,192,15,0.06);
+      box-shadow: 0 0 30px rgba(255,192,15,0.08);
+    }
+
+    /* Inputs */
+    .field {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--charcoal-border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 14px;
+      color: #e2e2ea;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .field:focus {
+      border-color: rgba(255,192,15,0.4);
+      box-shadow: 0 0 0 3px rgba(255,192,15,0.08);
+    }
+    .field option { background: #1a1a22; }
+
+    /* Buttons */
+    .btn-primary {
+      background: var(--yellow);
+      color: #07070e;
+      font-weight: 700;
+      border-radius: 14px;
+      padding: 16px;
+      width: 100%;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      letter-spacing: 0.01em;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-primary::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .btn-primary:hover { background: #ffd040; transform: translateY(-1px); box-shadow: 0 10px 30px rgba(255,192,15,0.35); }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.04);
+      color: #aaa;
+      border: 1px solid var(--charcoal-border);
+      font-weight: 500;
+      border-radius: 14px;
+      padding: 14px;
+      width: 100%;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.07); color: #e2e2ea; }
+
+    .btn-green {
+      background: rgba(10,40,24,0.9);
+      color: #4ade80;
+      border: 1px solid rgba(74,222,128,0.18);
+      font-weight: 600;
+      border-radius: 14px;
+      padding: 16px;
+      width: 100%;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-green:hover { box-shadow: 0 8px 28px rgba(74,222,128,0.12); background: rgba(15,55,32,0.9); }
+    .btn-green:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* Progress */
+    .progress-track {
+      height: 5px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #b38a00, var(--yellow), #ffe57a);
+      border-radius: 99px;
+      transition: width 0.7s cubic-bezier(0.4,0,0.2,1);
+      box-shadow: 0 0 14px rgba(255,192,15,0.55);
+    }
+
+    /* Step dots */
+    .step-dot {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--charcoal-border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: #555;
+      transition: all 0.35s;
+      margin: 0 auto;
+    }
+    .step-dot.active {
+      background: var(--yellow);
+      color: #07070e;
+      font-weight: 700;
+      border-color: var(--yellow);
+      box-shadow: 0 0 20px rgba(255,192,15,0.45);
+    }
+
+    /* Terminal */
+    .terminal {
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 14px;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 11px;
+      height: 175px;
+      overflow-y: auto;
+      padding: 14px 16px;
+    }
+    .terminal::-webkit-scrollbar { width: 3px; }
+    .terminal::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
+
+    /* Animations */
+    .log-line { animation: fadeUp 0.18s ease; margin-bottom: 2px; line-height: 1.5; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+    /* Tag */
+    .tag {
+      display: inline-block;
+      background: var(--yellow-dim);
+      color: var(--yellow);
+      border: 1px solid rgba(255,192,15,0.18);
+      border-radius: 99px;
+      padding: 2px 10px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* Result labels */
+    .rlabel { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+    .rvalue { font-size: 13px; color: #e2e2ea; }
+
+    /* Divider glow */
+    .divider-glow {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,192,15,0.3), transparent);
+      margin: 24px 0;
+    }
+
+    /* Feature card hover */
+    .feat-card {
+      background: rgba(20,20,28,0.6);
+      border: 1px solid var(--charcoal-border);
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+      backdrop-filter: blur(8px);
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .feat-card:hover { border-color: rgba(255,192,15,0.2); transform: translateY(-2px); }
+  </style>
+</head>
+<body>
+
+  <!-- Galaxy canvas -->
+  <canvas id="galaxy-canvas"></canvas>
+
+  <!-- Nebula layers -->
+  <div class="nb nb-1"></div>
+  <div class="nb nb-2"></div>
+  <div class="nb nb-3"></div>
+  <div class="nb nb-4"></div>
+
+  <!-- ══ HEADER ══ -->
+  <header class="header-bar px-6 py-4 content">
+    <div class="max-w-3xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <img src="/logo.png" alt="10mais" class="h-9 w-auto"
+          onerror="this.style.display='none';document.getElementById('logo-fb').style.display='flex'" />
+        <div id="logo-fb" style="display:none;width:32px;height:32px;background:var(--yellow);border-radius:8px;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#07070e">10</div>
+        <div class="flex flex-col leading-tight">
+          <span style="font-weight:800;font-size:17px;letter-spacing:-0.02em;color:#fff">10Editor</span>
+          <span style="font-size:9px;color:#555;letter-spacing:0.14em;text-transform:uppercase">by 10mais</span>
+        </div>
+        <span class="tag">IA</span>
+      </div>
+      <div style="font-size:11px;color:#444" class="hidden sm:block">Claude · Whisper · Remotion</div>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 py-10 content">
+
+    <!-- ══ UPLOAD SECTION ══ -->
+    <div id="upload-section">
+      <div class="text-center mb-10">
+        <div class="inline-flex items-center gap-2 mb-5"
+          style="background:rgba(255,192,15,0.07);border:1px solid rgba(255,192,15,0.18);border-radius:99px;padding:6px 16px">
+          <span class="pulse" style="width:6px;height:6px;border-radius:50%;background:var(--yellow);display:inline-block"></span>
+          <span style="font-size:11px;font-weight:600;color:var(--yellow);letter-spacing:0.04em">POWERED BY CLAUDE AI</span>
+        </div>
+        <h1 style="font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-0.03em;line-height:1.1" class="mb-4">
+          Edite o seu vídeo<br/>
+          <span style="color:var(--yellow)">com IA</span>
+        </h1>
+        <p style="color:#666;font-size:14px;max-width:380px;margin:0 auto;line-height:1.6">
+          Basta enviar o seu vídeo. A IA transcreve, corta, adiciona legendas, efeitos, trilha sonora, tudo automaticamente.
+        </p>
+      </div>
+
+      <div class="card p-6 mb-4">
+        <!-- Drop zone -->
+        <div id="drop-zone" class="drop-zone p-10 text-center mb-5"
+          onclick="document.getElementById('file-input').click()">
+          <div id="drop-content">
+            <div style="width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:var(--yellow-dim);display:flex;align-items:center;justify-content:center">
+              <svg style="width:26px;height:26px;color:var(--yellow)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+              </svg>
+            </div>
+            <p style="font-weight:600;color:#d0d0d8;margin-bottom:4px">Arraste seu vídeo aqui</p>
+            <p style="font-size:13px;color:#555">ou clique para selecionar</p>
+            <p style="font-size:11px;color:#333;margin-top:8px">MP4, MOV, AVI · até 2GB</p>
+          </div>
+          <div id="drop-selected" class="hidden">
+            <div style="width:48px;height:48px;margin:0 auto 12px;border-radius:50%;background:rgba(74,222,128,0.08);display:flex;align-items:center;justify-content:center">
+              <svg style="width:22px;height:22px" class="text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <p style="font-weight:600;color:#4ade80;font-size:14px" id="selected-filename"></p>
+            <p style="font-size:12px;color:#555;margin-top:4px" id="selected-filesize"></p>
+          </div>
+        </div>
+        <input type="file" id="file-input" accept="video/*" class="hidden" />
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="rlabel block mb-2">Plataforma</label>
+            <select id="platform" class="field">
+              <option value="instagram">Instagram / Reels</option>
+              <option value="tiktok">TikTok</option>
+              <option value="youtube">YouTube</option>
+            </select>
+          </div>
+          <div>
+            <label class="rlabel block mb-2">Formato</label>
+            <select id="format" class="field">
+              <option value="vertical">Vertical 9:16</option>
+              <option value="horizontal">Horizontal 16:9</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-5">
+          <label class="rlabel block mb-2">Contexto (opcional)</label>
+          <input id="context" type="text" class="field"
+            placeholder="Ex: vídeo educativo sobre produtividade com IA..." />
+        </div>
+
+        <!-- Ajustes avançados -->
+        <details id="advanced-details" style="margin-bottom:20px">
+          <summary style="cursor:pointer;font-size:12px;color:#555;user-select:none;display:flex;align-items:center;gap:6px;list-style:none;padding:8px 0">
+            <svg id="adv-icon" style="width:14px;height:14px;transition:transform 0.2s;color:#555" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+            </svg>
+            <span>Ajustes de edição</span>
+            <svg id="adv-chevron" style="width:12px;height:12px;margin-left:auto;transition:transform 0.2s;color:#444" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </summary>
+
+          <div style="margin-top:14px;display:flex;flex-direction:column;gap:14px;padding:16px;background:rgba(255,255,255,0.02);border-radius:14px;border:1px solid rgba(255,255,255,0.05)">
+
+            <!-- Agressividade dos cortes -->
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <label class="rlabel">Agressividade dos cortes</label>
+                <span id="cut-label" style="font-size:12px;color:var(--yellow);font-weight:600">Moderado (3)</span>
+              </div>
+              <input type="range" id="cut-aggressiveness" min="1" max="5" value="3" step="1"
+                oninput="updateCutLabel(this.value)"
+                style="width:100%;accent-color:var(--yellow);cursor:pointer" />
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:#444;margin-top:3px">
+                <span>Suave</span><span>Moderado</span><span>Agressivo</span>
+              </div>
+            </div>
+
+            <!-- Velocidade do vídeo -->
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <label class="rlabel">Velocidade do vídeo</label>
+                <span id="speed-label" style="font-size:12px;color:var(--yellow);font-weight:600">1.2×</span>
+              </div>
+              <input type="range" id="video-speed" min="0.8" max="2.0" value="1.2" step="0.1"
+                oninput="document.getElementById('speed-label').textContent=parseFloat(this.value).toFixed(1)+'×'"
+                style="width:100%;accent-color:var(--yellow);cursor:pointer" />
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:#444;margin-top:3px">
+                <span>0.8×</span><span>1.2×</span><span>2.0×</span>
+              </div>
+            </div>
+
+            <!-- Volume da música -->
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <label class="rlabel">Volume da música de fundo</label>
+                <span id="vol-label" style="font-size:12px;color:var(--yellow);font-weight:600">20%</span>
+              </div>
+              <input type="range" id="music-volume" min="0" max="60" value="20" step="5"
+                oninput="document.getElementById('vol-label').textContent=this.value+'%'"
+                style="width:100%;accent-color:var(--yellow);cursor:pointer" />
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:#444;margin-top:3px">
+                <span>Mudo</span><span>20%</span><span>60%</span>
+              </div>
+            </div>
+
+            <!-- Tom e estilo -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="rlabel block mb-2">Tom do conteúdo</label>
+                <select id="content-tone" class="field" style="font-size:13px;padding:10px 12px">
+                  <option value="auto">Auto (Claude decide)</option>
+                  <option value="profissional">Profissional</option>
+                  <option value="casual">Casual</option>
+                  <option value="urgente">Urgente / Impactante</option>
+                  <option value="inspiracional">Inspiracional</option>
+                </select>
+              </div>
+              <div>
+                <label class="rlabel block mb-2">Estilo de legenda</label>
+                <select id="caption-style" class="field" style="font-size:13px;padding:10px 12px">
+                  <option value="auto">Auto (Claude decide)</option>
+                  <option value="clean">Clean</option>
+                  <option value="minimalista">Minimalista</option>
+                  <option value="destaque">Destaque (amarelo)</option>
+                  <option value="neon">Neon</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Toggle highlights -->
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <div style="font-size:13px;font-weight:500;color:#ccc">Mostrar highlights</div>
+                <div style="font-size:11px;color:#555;margin-top:2px">Destaque visual nos momentos-chave</div>
+              </div>
+              <label style="position:relative;width:40px;height:22px;cursor:pointer">
+                <input type="checkbox" id="show-highlights" checked style="opacity:0;width:0;height:0;position:absolute">
+                <span id="toggle-track" onclick="toggleHighlights()"
+                  style="position:absolute;inset:0;border-radius:99px;background:var(--yellow);transition:background 0.2s;display:flex;align-items:center;padding:2px">
+                  <span id="toggle-thumb"
+                    style="width:18px;height:18px;border-radius:50%;background:#07070e;transition:transform 0.2s;transform:translateX(18px)"></span>
+                </span>
+              </label>
+            </div>
+
+          </div>
+        </details>
+
+        <button id="upload-btn" onclick="startUpload()" class="btn-primary">
+          Iniciar Edição com IA
+        </button>
+      </div>
+
+      <div class="divider-glow"></div>
+
+      <div class="grid grid-cols-3 gap-3">
+        <div class="feat-card">
+          <div style="font-size:24px;margin-bottom:8px">🎙️</div>
+          <div style="font-size:12px;font-weight:600;color:#ccc">Transcrição</div>
+          <div style="font-size:11px;color:#444;margin-top:2px">OpenAI Whisper</div>
+        </div>
+        <div class="feat-card">
+          <div style="font-size:24px;margin-bottom:8px">🤖</div>
+          <div style="font-size:12px;font-weight:600;color:#ccc">Edição IA</div>
+          <div style="font-size:11px;color:#444;margin-top:2px">Claude Opus</div>
+        </div>
+        <div class="feat-card">
+          <div style="font-size:24px;margin-bottom:8px">🎬</div>
+          <div style="font-size:12px;font-weight:600;color:#ccc">Renderização</div>
+          <div style="font-size:11px;color:#444;margin-top:2px">Remotion</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PROGRESS SECTION ══ -->
+    <div id="progress-section" class="hidden">
+
+      <div class="card card-glow p-6 mb-4">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="status-dot" class="pulse"
+              style="width:8px;height:8px;border-radius:50%;background:var(--yellow);display:inline-block"></span>
+            <span style="font-size:14px;font-weight:600" id="step-label">Iniciando...</span>
+          </div>
+          <span style="font-size:14px;font-weight:700;color:var(--yellow)" id="progress-pct">0%</span>
+        </div>
+        <div class="progress-track mb-6">
+          <div class="progress-fill" id="progress-bar" style="width:0%"></div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-3">
+          <div class="text-center">
+            <div class="step-dot" id="step-1">1</div>
+            <p style="font-size:11px;color:#444;margin-top:6px">Áudio</p>
+          </div>
+          <div class="text-center">
+            <div class="step-dot" id="step-2">2</div>
+            <p style="font-size:11px;color:#444;margin-top:6px">Transcrição</p>
+          </div>
+          <div class="text-center">
+            <div class="step-dot" id="step-3">3</div>
+            <p style="font-size:11px;color:#444;margin-top:6px">Claude IA</p>
+          </div>
+          <div class="text-center">
+            <div class="step-dot" id="step-4">4</div>
+            <p style="font-size:11px;color:#444;margin-top:6px">Render</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terminal -->
+      <div class="terminal mb-4">
+        <div id="log-container"></div>
+      </div>
+
+      <!-- Result -->
+      <div id="result-card" class="hidden card p-5 mb-4">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <div style="width:3px;height:20px;border-radius:99px;background:var(--yellow)"></div>
+          <span style="font-size:13px;font-weight:700;color:var(--yellow)">Análise do Claude</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div>
+            <div class="rlabel">Título sugerido</div>
+            <div class="rvalue" style="font-weight:600" id="res-title"></div>
+          </div>
+          <div>
+            <div class="rlabel">Resumo</div>
+            <div class="rvalue" style="color:#888;font-size:13px;line-height:1.5" id="res-summary"></div>
+          </div>
+          <div style="display:flex;gap:24px;padding-top:4px">
+            <div><div class="rlabel">Duração</div><div class="rvalue" id="res-duration"></div></div>
+            <div><div class="rlabel">Mantidos</div><div style="font-size:13px;color:#4ade80" id="res-kept"></div></div>
+            <div><div class="rlabel">Removidos</div><div style="font-size:13px;color:#f87171" id="res-removed"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <button id="render-btn" onclick="startRender()" class="btn-green hidden mb-3">
+        Renderizar Vídeo Final
+      </button>
+      <a id="download-btn" href="#" class="btn-primary text-center block mb-3"
+        style="text-decoration:none;display:none">
+        Baixar Vídeo Editado
+      </a>
+      <button id="new-btn" onclick="resetApp()" class="btn-secondary hidden">
+        Editar novo vídeo
+      </button>
+    </div>
+
+  </main>
+
+  <!-- ══ GALAXY CANVAS SCRIPT ══ -->
+  <script>
+    const C = document.getElementById('galaxy-canvas');
+    const X = C.getContext('2d');
+    let W, H, stars = [], dustClouds = [];
+
+    function resize() {
+      W = C.width  = window.innerWidth;
+      H = C.height = window.innerHeight;
+      buildScene();
+    }
+
+    function buildScene() {
+      // Stars — 3 layers (depth)
+      stars = [];
+      // Distant tiny stars
+      for (let i = 0; i < 220; i++) {
+        stars.push({ x: Math.random()*W, y: Math.random()*H,
+          r: Math.random()*0.8+0.1, o: Math.random()*0.35+0.05,
+          sp: 0.04+Math.random()*0.08, ph: Math.random()*Math.PI*2, layer: 0 });
+      }
+      // Mid stars
+      for (let i = 0; i < 100; i++) {
+        stars.push({ x: Math.random()*W, y: Math.random()*H,
+          r: Math.random()*1.2+0.4, o: Math.random()*0.5+0.1,
+          sp: 0.06+Math.random()*0.1, ph: Math.random()*Math.PI*2, layer: 1 });
+      }
+      // Bright foreground stars
+      for (let i = 0; i < 28; i++) {
+        stars.push({ x: Math.random()*W, y: Math.random()*H,
+          r: Math.random()*1.8+1, o: Math.random()*0.7+0.3,
+          sp: 0.03+Math.random()*0.05, ph: Math.random()*Math.PI*2, layer: 2,
+          cross: Math.random() > 0.6 });
+      }
+      // Dust / star cluster clouds
+      dustClouds = Array.from({ length: 5 }, () => ({
+        x: Math.random()*W, y: Math.random()*H,
+        r: 60+Math.random()*120,
+        hue: [260,220,200,30,300][Math.floor(Math.random()*5)],
+        o: 0.03+Math.random()*0.05,
+      }));
+    }
+
+    function drawCross(cx, cy, size, alpha) {
+      X.save();
+      X.globalAlpha = alpha * 0.5;
+      X.strokeStyle = '#fff';
+      X.lineWidth = 0.5;
+      const len = size * 4;
+      X.beginPath(); X.moveTo(cx-len,cy); X.lineTo(cx+len,cy); X.stroke();
+      X.beginPath(); X.moveTo(cx,cy-len); X.lineTo(cx,cy+len); X.stroke();
+      X.restore();
+    }
+
+    let frame = 0;
+    function draw() {
+      frame++;
+      X.clearRect(0, 0, W, H);
+
+      // Dust clouds
+      dustClouds.forEach(d => {
+        const g = X.createRadialGradient(d.x,d.y,0,d.x,d.y,d.r);
+        g.addColorStop(0, `hsla(${d.hue},80%,70%,${d.o})`);
+        g.addColorStop(1, 'transparent');
+        X.fillStyle = g;
+        X.beginPath(); X.arc(d.x,d.y,d.r,0,Math.PI*2); X.fill();
+      });
+
+      // Stars
+      stars.forEach(s => {
+        const flicker = s.o + 0.18 * Math.sin(frame * s.sp + s.ph);
+        const alpha = Math.max(0, Math.min(1, flicker));
+
+        // Glow for bright stars
+        if (s.layer === 2) {
+          const glow = X.createRadialGradient(s.x,s.y,0,s.x,s.y,s.r*5);
+          glow.addColorStop(0, `rgba(200,200,255,${alpha*0.4})`);
+          glow.addColorStop(1, 'transparent');
+          X.fillStyle = glow;
+          X.beginPath(); X.arc(s.x,s.y,s.r*5,0,Math.PI*2); X.fill();
+          if (s.cross) drawCross(s.x, s.y, s.r, alpha);
+        }
+
+        const color = s.layer === 2
+          ? `rgba(230,235,255,${alpha})`
+          : s.layer === 1
+          ? `rgba(200,210,240,${alpha})`
+          : `rgba(160,170,210,${alpha})`;
+
+        X.fillStyle = color;
+        X.beginPath(); X.arc(s.x, s.y, s.r, 0, Math.PI*2); X.fill();
+      });
+
+      // Galaxy arm — faint spiral hint
+      if (frame % 2 === 0) {
+        const cx = W*0.72, cy = H*0.25;
+        for (let a = 0; a < Math.PI*3; a += 0.12) {
+          const rr = a*28 + (Math.sin(frame*0.003+a)*4);
+          const px = cx + Math.cos(a)*rr, py = cy + Math.sin(a)*rr*0.45;
+          if (px < 0||px > W||py < 0||py > H) continue;
+          X.fillStyle = `rgba(180,160,255,${0.03+Math.random()*0.02})`;
+          X.beginPath(); X.arc(px,py,Math.random()*1.2,0,Math.PI*2); X.fill();
+        }
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+    requestAnimationFrame(draw);
+
+    // Shooting stars
+    function shootingStar() {
+      const el = document.createElement('div');
+      const startX = Math.random()*W*1.2+100;
+      const startY = Math.random()*H*0.4;
+      const len = 80+Math.random()*120;
+      Object.assign(el.style, {
+        position:'fixed', left:startX+'px', top:startY+'px',
+        width:len+'px', height:'1px',
+        background:'linear-gradient(90deg,rgba(255,255,255,0.9),transparent)',
+        borderRadius:'99px',
+        pointerEvents:'none', zIndex:'0',
+        transformOrigin:'right center',
+        transform:'rotate(-'+(20+Math.random()*25)+'deg)',
+        animation:'shootLine '+(0.5+Math.random()*0.4)+'s linear forwards',
+        boxShadow:'0 0 4px rgba(255,255,255,0.6)',
+      });
+      document.body.appendChild(el);
+      setTimeout(()=>el.remove(), 1200);
+    }
+    const style = document.createElement('style');
+    style.textContent=`@keyframes shootLine{from{opacity:1;transform:translateX(0) rotate(-25deg)}to{opacity:0;transform:translateX(-300px) rotate(-25deg)}}`;
+    document.head.appendChild(style);
+    setInterval(shootingStar, 3500);
+    setTimeout(shootingStar, 800);
+    setTimeout(shootingStar, 2000);
+  </script>
+
+  <!-- ══ APP LOGIC ══ -->
+  <script>
+    let currentJobId = null, selectedFile = null, eventSource = null, currentFormat = 'vertical';
+    let highlightsOn = true;
+
+    // ── Advanced controls ──
+    const CUT_LABELS = ['','Suave (1)','Leve (2)','Moderado (3)','Agressivo (4)','Máximo (5)'];
+    function updateCutLabel(v) {
+      document.getElementById('cut-label').textContent = CUT_LABELS[v] || v;
+    }
+    function toggleHighlights() {
+      highlightsOn = !highlightsOn;
+      const track = document.getElementById('toggle-track');
+      const thumb = document.getElementById('toggle-thumb');
+      track.style.background = highlightsOn ? 'var(--yellow)' : '#333';
+      thumb.style.transform = highlightsOn ? 'translateX(18px)' : 'translateX(2px)';
+    }
+    document.getElementById('advanced-details').addEventListener('toggle', function() {
+      document.getElementById('adv-chevron').style.transform = this.open ? 'rotate(180deg)' : '';
+    });
+
+    document.getElementById('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
+    document.getElementById('format').addEventListener('change', e => currentFormat = e.target.value);
+
+    const dz = document.getElementById('drop-zone');
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragging'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('dragging'));
+    dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragging'); handleFile(e.dataTransfer.files[0]); });
+
+    function handleFile(f) {
+      if (!f || !f.type.startsWith('video/')) return;
+      selectedFile = f;
+      document.getElementById('drop-content').classList.add('hidden');
+      document.getElementById('drop-selected').classList.remove('hidden');
+      document.getElementById('selected-filename').textContent = f.name;
+      document.getElementById('selected-filesize').textContent = fmtSize(f.size);
+    }
+
+    function fmtSize(b) {
+      if (b < 1048576) return (b/1024).toFixed(1)+' KB';
+      if (b < 1073741824) return (b/1048576).toFixed(1)+' MB';
+      return (b/1073741824).toFixed(2)+' GB';
+    }
+
+    async function startUpload() {
+      if (!selectedFile) { alert('Selecione um vídeo primeiro!'); return; }
+      const btn = document.getElementById('upload-btn');
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      const fd = new FormData();
+      fd.append('video', selectedFile);
+      fd.append('platform', document.getElementById('platform').value);
+      fd.append('context', document.getElementById('context').value);
+      fd.append('cutAggressiveness', document.getElementById('cut-aggressiveness').value);
+      fd.append('videoSpeed', document.getElementById('video-speed').value);
+      fd.append('musicVolume', document.getElementById('music-volume').value);
+      fd.append('contentTone', document.getElementById('content-tone').value);
+      fd.append('captionStyleOverride', document.getElementById('caption-style').value);
+      fd.append('showHighlights', String(highlightsOn));
+      try {
+        const r = await fetch('/api/upload', { method:'POST', body:fd });
+        const d = await r.json();
+        if (!d.jobId) throw new Error(d.error||'Erro ao iniciar');
+        currentJobId = d.jobId;
+        document.getElementById('upload-section').classList.add('hidden');
+        document.getElementById('progress-section').classList.remove('hidden');
+        connectSSE(d.jobId);
+      } catch(e) {
+        btn.disabled = false; btn.textContent = 'Iniciar Edição com IA';
+        alert('Erro: '+e.message);
+      }
+    }
+
+    function connectSSE(id) {
+      if (eventSource) eventSource.close();
+      eventSource = new EventSource(`/api/progress/${id}`);
+      eventSource.onmessage = e => handleProgress(JSON.parse(e.data));
+    }
+
+    function handleProgress(d) {
+      if (d.progress !== undefined) {
+        document.getElementById('progress-bar').style.width = d.progress+'%';
+        document.getElementById('progress-pct').textContent = d.progress+'%';
+      }
+      if (d.step) document.getElementById('step-label').textContent = d.step;
+      if (d.log) addLog(d.log);
+      if (d.logs) d.logs.forEach(addLog);
+      if (d.progress >= 20) activateStep(1);
+      if (d.progress >= 45) activateStep(2);
+      if (d.progress >= 70) activateStep(3);
+      if (d.progress >= 95) activateStep(4);
+      if (d.status === 'ready_to_render') { showResult(d.result); document.getElementById('render-btn').classList.remove('hidden'); }
+      if (d.status === 'rendering') document.getElementById('render-btn').classList.add('hidden');
+      if (d.status === 'done' && d.outputFile) {
+        activateStep(4);
+        document.getElementById('progress-bar').style.width = '100%';
+        document.getElementById('progress-pct').textContent = '100%';
+        document.getElementById('step-label').textContent = 'Vídeo pronto!';
+        const dot = document.getElementById('status-dot');
+        dot.classList.remove('pulse'); dot.style.background = '#4ade80';
+        const dl = document.getElementById('download-btn');
+        dl.href = `/api/download/${currentJobId}`; dl.style.display = 'block';
+        document.getElementById('new-btn').classList.remove('hidden');
+        if (eventSource) eventSource.close();
+      }
+      if (d.status === 'error') {
+        document.getElementById('step-label').textContent = 'Erro no processamento';
+        const dot = document.getElementById('status-dot');
+        dot.classList.remove('pulse'); dot.style.background = '#f87171';
+        addLog('❌ '+d.error);
+        document.getElementById('new-btn').classList.remove('hidden');
+        if (eventSource) eventSource.close();
+      }
+    }
+
+    async function startRender() {
+      const btn = document.getElementById('render-btn');
+      btn.disabled = true; btn.textContent = 'Renderizando...';
+      await fetch(`/api/render/${currentJobId}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ format: currentFormat }),
+      });
+    }
+
+    function addLog(line) {
+      if (!line||!line.trim()) return;
+      const clean = line.replace(/\x1b\[[0-9;]*m/g,'').trim();
+      if (!clean) return;
+      const el = document.createElement('div');
+      el.className = 'log-line';
+      if (clean.includes('✅')||clean.includes('concluído')||clean.includes('pronto')) el.style.color='#4ade80';
+      else if (clean.includes('❌')||clean.includes('error')||clean.includes('Erro')) el.style.color='#f87171';
+      else if (clean.includes('Passo')||clean.includes('Pipeline')) el.style.color='#ffc00f';
+      else if (clean.includes('🎵')||clean.includes('🎨')||clean.includes('🤖')) el.style.color='#a78bfa';
+      else el.style.color='#444';
+      el.textContent = clean;
+      const c = document.getElementById('log-container');
+      c.appendChild(el); c.scrollTop = c.scrollHeight;
+    }
+
+    function activateStep(n) {
+      const el = document.getElementById('step-'+n);
+      if (!el||el.classList.contains('active')) return;
+      el.classList.add('active'); el.textContent = '✓';
+    }
+
+    function showResult(r) {
+      if (!r) return;
+      document.getElementById('result-card').classList.remove('hidden');
+      document.getElementById('res-title').textContent = r.title||'—';
+      document.getElementById('res-summary').textContent = r.summary||'—';
+      document.getElementById('res-duration').textContent = r.duration ? r.duration.toFixed(1)+'s' : '—';
+      document.getElementById('res-kept').textContent = r.keptSegments??'—';
+      document.getElementById('res-removed').textContent = r.removedSegments??'—';
+    }
+
+    function resetApp() {
+      if (eventSource) eventSource.close();
+      currentJobId=null; selectedFile=null; currentFormat='vertical';
+      document.getElementById('progress-section').classList.add('hidden');
+      document.getElementById('upload-section').classList.remove('hidden');
+      const btn = document.getElementById('upload-btn');
+      btn.disabled=false; btn.textContent='Iniciar Edição com IA';
+      document.getElementById('drop-content').classList.remove('hidden');
+      document.getElementById('drop-selected').classList.add('hidden');
+      document.getElementById('log-container').innerHTML='';
+      document.getElementById('result-card').classList.add('hidden');
+      const rb = document.getElementById('render-btn');
+      rb.classList.add('hidden'); rb.disabled=false; rb.textContent='Renderizar Vídeo Final';
+      document.getElementById('download-btn').style.display='none';
+      document.getElementById('new-btn').classList.add('hidden');
+      document.getElementById('file-input').value='';
+      document.getElementById('progress-bar').style.width='0%';
+      document.getElementById('progress-pct').textContent='0%';
+      document.getElementById('step-label').textContent='Iniciando...';
+      const dot=document.getElementById('status-dot');
+      dot.style.background=''; dot.classList.add('pulse');
+      for(let i=1;i<=4;i++){
+        const s=document.getElementById('step-'+i);
+        if(s){s.classList.remove('active');s.textContent=i;}
+      }
+    }
+  </script>
+</body>
+</html>

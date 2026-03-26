@@ -1,0 +1,10 @@
+node_modules
+out/
+uploads/
+.env
+public/*.mp4
+public/*.mp3
+public/*.mp3
+*.log
+.git
+.gitignore

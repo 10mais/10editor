@@ -1,0 +1,44 @@
+{
+  "name": "editor-10mais",
+  "version": "1.0.0",
+  "description": "Editor de vídeo com Claude API + OpenAI Whisper + Remotion",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "web": "ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "remotion:studio": "remotion studio src/compositions/Root.tsx",
+    "remotion:render": "remotion render src/compositions/Root.tsx VideoEditor out/video.mp4",
+    "pipeline": "ts-node src/pipeline.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.51.0",
+    "@remotion/cli": "^4.0.0",
+    "@remotion/player": "^4.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.1.0",
+    "@types/uuid": "^10.0.0",
+    "chalk": "^4.1.2",
+    "commander": "^12.1.0",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "fluent-ffmpeg": "^2.1.3",
+    "multer": "^2.1.1",
+    "openai": "^4.77.0",
+    "ora": "^5.4.1",
+    "remotion": "^4.0.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/fluent-ffmpeg": "^2.1.27",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  }
+}
