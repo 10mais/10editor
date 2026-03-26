@@ -28,6 +28,7 @@ export interface VideoEditorProps {
   musicVolume?: number;
   whooshSrc?: string;
   popSrc?: string;
+  [key: string]: unknown;
 }
 
 export const VideoEditor: React.FC<VideoEditorProps> = ({
