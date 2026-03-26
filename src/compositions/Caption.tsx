@@ -1,5 +1,5 @@
 import React from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
+import { useCurrentFrame, useVideoConfig, spring } from 'remotion';
 import { TranscriptionSegment } from '../transcribe';
 import { CaptionStyle } from '../ai-editor';
 
@@ -8,6 +8,23 @@ interface CaptionProps {
   segmentOutputTimes: Array<{ seg: TranscriptionSegment; outputStart: number }>;
   style: CaptionStyle;
   highlights: TranscriptionSegment[];
+  segmentIndex?: number;
+}
+
+// Paletas virais que variam por segmento
+const VIRAL_PALETTES = [
+  { text: '#FFFFFF', shadow: '#000000', accent: null },           // branco puro
+  { text: '#FFE600', shadow: '#000000', accent: null },           // amarelo viral
+  { text: '#FFFFFF', shadow: '#000000', accent: '#FF2D55' },      // branco + rosa
+  { text: '#00E5FF', shadow: '#000000', accent: null },           // ciano
+  { text: '#FFFFFF', shadow: '#1a1a1a', accent: '#ffc00f' },      // branco + 10mais
+];
+
+// Quebra texto em frases curtas (máx 5 palavras / 1 linha)
+function splitToShortPhrase(text: string, maxWords = 5): string {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= maxWords) return text.trim();
+  return words.slice(0, maxWords).join(' ');
 }
 
 export const Caption: React.FC<CaptionProps> = ({
@@ -15,11 +32,11 @@ export const Caption: React.FC<CaptionProps> = ({
   segmentOutputTimes,
   style,
   highlights,
+  segmentIndex = 0,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Encontra o segmento ativo pelo frame de saída
   const activeEntry = segmentOutputTimes.find(({ seg, outputStart }) => {
     const duration = Math.floor((seg.end - seg.start) * fps);
     return frame >= outputStart && frame < outputStart + duration;
@@ -29,66 +46,72 @@ export const Caption: React.FC<CaptionProps> = ({
 
   const { seg: activeSegment, outputStart } = activeEntry;
   const localFrame = frame - outputStart;
-  const segDuration = Math.floor((activeSegment.end - activeSegment.start) * fps);
 
-  // Não mostra legenda se este segmento é um highlight (o Highlight.tsx já exibe)
   const isHighlight = highlights.some(
     (h) => h.start === activeSegment.start && h.end === activeSegment.end
   );
   if (isHighlight) return null;
 
-  // Animações
-  let opacity = 1;
-  let translateY = 0;
-  let scale = 1;
+  // Paleta baseada no índice do segmento (varia por clipe)
+  const palette = VIRAL_PALETTES[segmentIndex % VIRAL_PALETTES.length];
 
-  if (style.animation === 'fade') {
-    opacity = interpolate(localFrame, [0, 4, segDuration - 4, segDuration], [0, 1, 1, 0], {
-      extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
-    });
-  } else if (style.animation === 'slide') {
-    translateY = interpolate(localFrame, [0, 8], [14, 0], { extrapolateRight: 'clamp' });
-    opacity = interpolate(localFrame, [0, 6], [0, 1], { extrapolateRight: 'clamp' });
-  } else if (style.animation === 'pop') {
-    scale = spring({ frame: localFrame, fps, config: { damping: 14, stiffness: 220 } });
-    opacity = interpolate(localFrame, [0, 4], [0, 1], { extrapolateRight: 'clamp' });
-  }
+  // Animação POP — igual ao estilo viral do TikTok/Reels
+  const scale = spring({
+    frame: localFrame,
+    fps,
+    config: { damping: 12, stiffness: 280, mass: 0.6 },
+  });
 
-  // Posição no "último terço" da área segura do Instagram
-  // ~68% do topo — acima da barra de likes/comentários
-  const positionStyle: React.CSSProperties = { top: '68%' };
+  // Texto curto — máx 1 linha
+  const displayText = splitToShortPhrase(activeSegment.text, 5);
 
+  // Posição segura do Instagram — 68% do topo
   return (
     <div
       style={{
         position: 'absolute',
+        top: '68%',
         left: 0,
         right: 0,
         display: 'flex',
         justifyContent: 'center',
-        padding: '0 72px',
-        opacity,
-        transform: `scale(${scale}) translateY(${translateY}px)`,
-        ...positionStyle,
+        padding: '0 60px',
+        transform: `scale(${scale})`,
+        transformOrigin: 'center center',
       }}
     >
       <div
         style={{
-          fontFamily: style.fontFamily,
-          fontSize: Math.min(style.fontSize, 38), // máx 38px — discreta
-          color: style.color,
-          backgroundColor: 'rgba(0,0,0,0.52)',
-          padding: '8px 18px',
-          borderRadius: 6,
+          fontFamily: "'Montserrat', 'Arial Black', sans-serif",
+          fontSize: 46,
+          fontWeight: 900,
+          color: palette.text,
           textAlign: 'center',
-          maxWidth: '88%',
-          lineHeight: 1.35,
-          fontWeight: 600,
-          letterSpacing: 0.2,
-          backdropFilter: 'blur(2px)',
+          maxWidth: '90%',
+          lineHeight: 1.15,
+          letterSpacing: -0.5,
+          // Sombra grossa estilo viral — sem caixa de fundo
+          textShadow: [
+            `3px 3px 0px ${palette.shadow}`,
+            `-3px 3px 0px ${palette.shadow}`,
+            `3px -3px 0px ${palette.shadow}`,
+            `-3px -3px 0px ${palette.shadow}`,
+            `0px 4px 8px rgba(0,0,0,0.8)`,
+          ].join(', '),
+          WebkitTextStroke: palette.accent ? `1.5px ${palette.accent}` : '1px rgba(0,0,0,0.4)',
+          // Fundo adaptado — leve e discreto quando necessário
+          backgroundColor:
+            segmentIndex % 3 === 0
+              ? 'rgba(0,0,0,0.0)'   // sem fundo
+              : segmentIndex % 3 === 1
+              ? 'rgba(0,0,0,0.0)'   // sem fundo
+              : 'rgba(0,0,0,0.0)',  // sem fundo — sombra basta
+          padding: '4px 12px',
+          borderRadius: 4,
+          display: 'inline-block',
         }}
       >
-        {activeSegment.text}
+        {displayText}
       </div>
     </div>
   );

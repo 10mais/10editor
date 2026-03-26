@@ -3,9 +3,9 @@ import { useCurrentFrame, useVideoConfig, Video, interpolate, staticFile } from 
 
 interface SegmentVideoProps {
   src: string;
-  startFrom: number;       // frame de início no vídeo original
+  startFrom: number;
   durationInFrames: number;
-  index: number;           // índice do segmento (par = zoom in, ímpar = zoom out)
+  index: number;
   playbackRate?: number;
 }
 
@@ -18,38 +18,26 @@ export const SegmentVideo: React.FC<SegmentVideoProps> = ({
 }) => {
   const frame = useCurrentFrame();
 
-  // ── Zoom Ken Burns ──────────────────────────────────────
-  // Segmentos pares: zoom in suave (1.0 → 1.06)
-  // Segmentos ímpares: zoom out suave (1.06 → 1.0)
+  // ── Zoom Ken Burns dinâmico ──────────────────────────────
+  // Alterna entre zoom in e zoom out suave por segmento
   const zoomIn = index % 2 === 0;
-  const scaleStart = zoomIn ? 1.0 : 1.06;
-  const scaleEnd = zoomIn ? 1.06 : 1.0;
+  const scaleStart = zoomIn ? 1.0 : 1.07;
+  const scaleEnd   = zoomIn ? 1.07 : 1.0;
   const scale = interpolate(frame, [0, durationInFrames], [scaleStart, scaleEnd], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  // ── Blur na transição ────────────────────────────────────
-  // Primeiros 5 frames: blur entra (6px → 0px)
-  // Últimos 5 frames: blur sai (0px → 5px)
-  const BLUR_FRAMES = 5;
-  const blurIn = interpolate(frame, [0, BLUR_FRAMES], [5, 0], {
+  // ── Leve pan horizontal em segmentos alternados ──────────
+  const panStart = index % 3 === 0 ? -1.5 : index % 3 === 1 ? 1.5 : 0;
+  const panEnd   = index % 3 === 0 ?  1.5 : index % 3 === 1 ? -1.5 : 0;
+  const panX = interpolate(frame, [0, durationInFrames], [panStart, panEnd], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const blurOut = interpolate(
-    frame,
-    [durationInFrames - BLUR_FRAMES, durationInFrames],
-    [0, 5],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
-  );
-  const blur = Math.max(blurIn, blurOut);
 
-  // ── Fade nas transições ──────────────────────────────────
-  const opacity = interpolate(frame, [0, 4, durationInFrames - 4, durationInFrames], [0, 1, 1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+  // ── CORTE SECO — sem fade, sem blur ─────────────────────
+  // Transição direta, estilo viral TikTok/Reels
 
   return (
     <div
@@ -57,25 +45,20 @@ export const SegmentVideo: React.FC<SegmentVideoProps> = ({
         position: 'absolute',
         inset: 0,
         overflow: 'hidden',
-        opacity,
       }}
     >
       <div
         style={{
           width: '100%',
           height: '100%',
-          transform: `scale(${scale})`,
+          transform: `scale(${scale}) translateX(${panX}px)`,
           transformOrigin: 'center center',
           filter: [
-            // ── Color grading profissional ──────────────────
-            'brightness(1.04)',
-            'contrast(1.09)',
-            'saturate(1.14)',
-            'hue-rotate(-2deg)',   // leve quente
-            blur > 0 ? `blur(${blur.toFixed(1)}px)` : '',
-          ]
-            .filter(Boolean)
-            .join(' '),
+            'brightness(1.05)',   // levemente mais brilhante
+            'contrast(1.10)',     // mais contrastado — viral
+            'saturate(1.18)',     // cores mais vivas
+            'hue-rotate(-3deg)',  // tom quente
+          ].join(' '),
         }}
       >
         <Video
