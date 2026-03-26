@@ -26,12 +26,15 @@ ENV REMOTION_CHROME_EXECUTABLE=/usr/bin/chromium
 
 WORKDIR /app
 
-# Copia dependências e instala
+# Copia dependências e instala TODAS (incluindo devDependencies para build)
 COPY package*.json ./
-RUN npm ci --omit=dev || npm install
+RUN npm install
 
 # Copia código fonte
 COPY . .
+
+# Compila TypeScript para JavaScript
+RUN npm run build
 
 # Cria pastas necessárias
 RUN mkdir -p out uploads public
@@ -40,5 +43,5 @@ RUN mkdir -p out uploads public
 ENV PORT=3333
 EXPOSE 3333
 
-# Inicia o servidor web
-CMD ["npx", "ts-node", "src/server.ts"]
+# Inicia o servidor compilado (mais rápido que ts-node)
+CMD ["node", "dist/server.js"]
