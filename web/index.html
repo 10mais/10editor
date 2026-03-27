@@ -362,7 +362,21 @@
             <p style="font-size:12px;color:#555;margin-top:4px" id="selected-filesize"></p>
           </div>
         </div>
-        <input type="file" id="file-input" accept="video/*" class="hidden" />
+        <input type="file" id="file-input" accept="video/*" class="hidden" multiple />
+
+        <!-- Upload progress bar (aparece durante envio) -->
+        <div id="upload-progress-wrap" class="hidden" style="margin-top:12px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:11px;color:#666">Enviando vídeo...</span>
+            <span style="font-size:11px;color:var(--yellow);font-weight:600" id="upload-pct">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="upload-bar" style="width:0%;transition:width 0.3s"></div>
+          </div>
+        </div>
+
+        <!-- Lista de vídeos selecionados (múltiplos) -->
+        <div id="video-list" class="hidden" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
 
         <div class="grid grid-cols-2 gap-3 mb-3">
           <div>
@@ -381,10 +395,28 @@
             </select>
           </div>
         </div>
+        <!-- Imagens extras -->
+        <div class="mb-4">
+          <label class="rlabel block mb-2">Imagens extras (opcional)</label>
+          <div id="image-drop" onclick="document.getElementById('image-input').click()"
+            style="border:1px dashed rgba(255,192,15,0.15);border-radius:12px;padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:all 0.2s;background:rgba(255,255,255,0.01)"
+            onmouseover="this.style.borderColor='rgba(255,192,15,0.35)'"
+            onmouseout="this.style.borderColor='rgba(255,192,15,0.15)'">
+            <svg style="width:18px;height:18px;color:#555;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            <span id="image-label" style="font-size:13px;color:#555">Adicionar imagens (logo, capa, overlay…)</span>
+          </div>
+          <input type="file" id="image-input" accept="image/*" class="hidden" multiple />
+          <div id="image-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+        </div>
+
+        <!-- Instruções para a IA -->
         <div class="mb-5">
-          <label class="rlabel block mb-2">Contexto (opcional)</label>
-          <input id="context" type="text" class="field"
-            placeholder="Ex: vídeo educativo sobre produtividade com IA..." />
+          <label class="rlabel block mb-2">Instruções para a IA</label>
+          <textarea id="context" class="field" rows="3"
+            placeholder="Ex: remova pausas longas, adicione legendas em amarelo, use música lo-fi, foco nos momentos mais impactantes, tom profissional..."
+            style="resize:vertical;min-height:72px;line-height:1.5"></textarea>
         </div>
 
         <!-- Ajustes avançados -->
@@ -576,6 +608,29 @@
         </div>
       </div>
 
+      <!-- Painel de instruções pós-análise -->
+      <div id="refine-card" class="hidden card p-5 mb-4">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <div style="width:3px;height:20px;border-radius:99px;background:#a78bfa"></div>
+          <span style="font-size:13px;font-weight:700;color:#a78bfa">Ajustar instruções antes de renderizar</span>
+        </div>
+        <textarea id="refine-instructions" class="field" rows="3"
+          placeholder="Deseja algum ajuste? Ex: aumente a velocidade, coloque legenda menor, use tom mais dinâmico..."
+          style="resize:vertical;min-height:68px;line-height:1.5;margin-bottom:10px"></textarea>
+      </div>
+
+      <!-- Progresso da renderização -->
+      <div id="render-progress-wrap" class="hidden card p-4 mb-4">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:13px;font-weight:600;color:#ccc">Renderizando frames...</span>
+          <span style="font-size:13px;color:var(--yellow);font-weight:700" id="render-frames-pct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="render-frames-bar" style="width:0%"></div>
+        </div>
+        <div style="font-size:11px;color:#444;margin-top:6px" id="render-frames-label">Aguardando início...</div>
+      </div>
+
       <button id="render-btn" onclick="startRender()" class="btn-green hidden mb-3">
         Renderizar Vídeo Final
       </button>
@@ -732,7 +787,7 @@
 
   <!-- ══ APP LOGIC ══ -->
   <script>
-    let currentJobId = null, selectedFile = null, eventSource = null, currentFormat = 'vertical';
+    let currentJobId = null, selectedFiles = [], selectedImages = [], eventSource = null, currentFormat = 'vertical';
     let highlightsOn = true;
 
     // ── Advanced controls ──
@@ -751,21 +806,75 @@
       document.getElementById('adv-chevron').style.transform = this.open ? 'rotate(180deg)' : '';
     });
 
-    document.getElementById('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
+    document.getElementById('file-input').addEventListener('change', e => handleFiles([...e.target.files]));
     document.getElementById('format').addEventListener('change', e => currentFormat = e.target.value);
+    document.getElementById('image-input').addEventListener('change', e => handleImages([...e.target.files]));
 
     const dz = document.getElementById('drop-zone');
     dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragging'); });
     dz.addEventListener('dragleave', () => dz.classList.remove('dragging'));
-    dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragging'); handleFile(e.dataTransfer.files[0]); });
+    dz.addEventListener('drop', e => {
+      e.preventDefault(); dz.classList.remove('dragging');
+      const videos = [...e.dataTransfer.files].filter(f => f.type.startsWith('video/'));
+      const images = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+      if (videos.length) handleFiles(videos);
+      if (images.length) handleImages(images);
+    });
 
-    function handleFile(f) {
-      if (!f || !f.type.startsWith('video/')) return;
-      selectedFile = f;
+    function handleFiles(files) {
+      const videos = files.filter(f => f.type.startsWith('video/'));
+      if (!videos.length) return;
+      selectedFiles = [...selectedFiles, ...videos];
+      renderVideoList();
+    }
+
+    function renderVideoList() {
+      if (!selectedFiles.length) return;
       document.getElementById('drop-content').classList.add('hidden');
       document.getElementById('drop-selected').classList.remove('hidden');
-      document.getElementById('selected-filename').textContent = f.name;
-      document.getElementById('selected-filesize').textContent = fmtSize(f.size);
+      document.getElementById('selected-filename').textContent =
+        selectedFiles.length === 1 ? selectedFiles[0].name : `${selectedFiles.length} vídeos selecionados`;
+      const totalSize = selectedFiles.reduce((a, f) => a + f.size, 0);
+      document.getElementById('selected-filesize').textContent = fmtSize(totalSize);
+
+      // Lista detalhada
+      const list = document.getElementById('video-list');
+      list.classList.remove('hidden');
+      list.innerHTML = selectedFiles.map((f, i) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.05)">
+          <span style="font-size:12px;color:#aaa;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i+1}. ${f.name}</span>
+          <span style="font-size:11px;color:#555;margin-left:8px">${fmtSize(f.size)}</span>
+          <button onclick="removeVideo(${i})" style="margin-left:10px;background:none;border:none;color:#f87171;cursor:pointer;font-size:14px;line-height:1">×</button>
+        </div>`).join('');
+    }
+
+    function removeVideo(i) {
+      selectedFiles.splice(i, 1);
+      if (!selectedFiles.length) {
+        document.getElementById('drop-content').classList.remove('hidden');
+        document.getElementById('drop-selected').classList.add('hidden');
+        document.getElementById('video-list').classList.add('hidden');
+      } else renderVideoList();
+    }
+
+    function handleImages(files) {
+      selectedImages = [...selectedImages, ...files];
+      const list = document.getElementById('image-list');
+      const label = document.getElementById('image-label');
+      label.textContent = `${selectedImages.length} imagem(ns) adicionada(s)`;
+      label.style.color = '#a78bfa';
+      list.innerHTML = selectedImages.map((f, i) => {
+        const url = URL.createObjectURL(f);
+        return `<div style="position:relative">
+          <img src="${url}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,0.1)">
+          <button onclick="removeImage(${i})" style="position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:#f87171;color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center">×</button>
+        </div>`;
+      }).join('');
+    }
+
+    function removeImage(i) {
+      selectedImages.splice(i, 1);
+      handleImages([]);
     }
 
     function fmtSize(b) {
@@ -774,12 +883,14 @@
       return (b/1073741824).toFixed(2)+' GB';
     }
 
-    async function startUpload() {
-      if (!selectedFile) { alert('Selecione um vídeo primeiro!'); return; }
+    function startUpload() {
+      if (!selectedFiles.length) { alert('Selecione pelo menos um vídeo!'); return; }
       const btn = document.getElementById('upload-btn');
       btn.disabled = true; btn.textContent = 'Enviando...';
+
       const fd = new FormData();
-      fd.append('video', selectedFile);
+      selectedFiles.forEach(f => fd.append('video', f));
+      selectedImages.forEach(f => fd.append('images', f));
       fd.append('platform', document.getElementById('platform').value);
       fd.append('context', document.getElementById('context').value);
       fd.append('cutAggressiveness', document.getElementById('cut-aggressiveness').value);
@@ -788,18 +899,42 @@
       fd.append('contentTone', document.getElementById('content-tone').value);
       fd.append('captionStyleOverride', document.getElementById('caption-style').value);
       fd.append('showHighlights', String(highlightsOn));
-      try {
-        const r = await fetch('/api/upload', { method:'POST', body:fd });
-        const d = await r.json();
-        if (!d.jobId) throw new Error(d.error||'Erro ao iniciar');
-        currentJobId = d.jobId;
-        document.getElementById('upload-section').classList.add('hidden');
-        document.getElementById('progress-section').classList.remove('hidden');
-        connectSSE(d.jobId);
-      } catch(e) {
+
+      // Barra de progresso de upload via XHR
+      document.getElementById('upload-progress-wrap').classList.remove('hidden');
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload');
+
+      xhr.upload.onprogress = e => {
+        if (!e.lengthComputable) return;
+        const pct = Math.round(e.loaded / e.total * 100);
+        document.getElementById('upload-bar').style.width = pct + '%';
+        document.getElementById('upload-pct').textContent = pct + '%';
+        btn.textContent = `Enviando ${pct}%...`;
+      };
+
+      xhr.onload = () => {
+        try {
+          const d = JSON.parse(xhr.responseText);
+          if (!d.jobId) throw new Error(d.error || 'Erro ao iniciar');
+          currentJobId = d.jobId;
+          document.getElementById('upload-section').classList.add('hidden');
+          document.getElementById('progress-section').classList.remove('hidden');
+          connectSSE(d.jobId);
+        } catch(e) {
+          btn.disabled = false; btn.textContent = 'Iniciar Edição com IA';
+          document.getElementById('upload-progress-wrap').classList.add('hidden');
+          alert('Erro: ' + e.message);
+        }
+      };
+
+      xhr.onerror = () => {
         btn.disabled = false; btn.textContent = 'Iniciar Edição com IA';
-        alert('Erro: '+e.message);
-      }
+        document.getElementById('upload-progress-wrap').classList.add('hidden');
+        alert('Erro de conexão ao enviar o vídeo.');
+      };
+
+      xhr.send(fd);
     }
 
     function connectSSE(id) {
@@ -820,8 +955,16 @@
       if (d.progress >= 45) activateStep(2);
       if (d.progress >= 70) activateStep(3);
       if (d.progress >= 95) activateStep(4);
-      if (d.status === 'ready_to_render') { showResult(d.result); document.getElementById('render-btn').classList.remove('hidden'); }
-      if (d.status === 'rendering') document.getElementById('render-btn').classList.add('hidden');
+      if (d.status === 'ready_to_render') {
+        showResult(d.result);
+        document.getElementById('render-btn').classList.remove('hidden');
+        document.getElementById('refine-card').classList.remove('hidden');
+      }
+      if (d.status === 'rendering') {
+        document.getElementById('render-btn').classList.add('hidden');
+        document.getElementById('refine-card').classList.add('hidden');
+        document.getElementById('render-progress-wrap').classList.remove('hidden');
+      }
       if (d.status === 'done' && d.outputFile) {
         activateStep(4);
         document.getElementById('progress-bar').style.width = '100%';
@@ -847,9 +990,10 @@
     async function startRender() {
       const btn = document.getElementById('render-btn');
       btn.disabled = true; btn.textContent = 'Renderizando...';
+      const refineInstructions = document.getElementById('refine-instructions').value;
       await fetch(`/api/render/${currentJobId}`, {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ format: currentFormat }),
+        body: JSON.stringify({ format: currentFormat, refineInstructions }),
       });
     }
 
@@ -857,6 +1001,20 @@
       if (!line||!line.trim()) return;
       const clean = line.replace(/\x1b\[[0-9;]*m/g,'').trim();
       if (!clean) return;
+
+      // Parse progresso do Remotion: "Rendering frames  90/900" ou "Encoded video 176/1385"
+      const renderMatch = clean.match(/(?:Rendering frames|Encoded video)\s+(\d+)\/(\d+)/i);
+      if (renderMatch) {
+        const curr = parseInt(renderMatch[1]), total = parseInt(renderMatch[2]);
+        if (total > 0) {
+          const pct = Math.min(99, Math.round(curr / total * 100));
+          document.getElementById('render-frames-bar').style.width = pct + '%';
+          document.getElementById('render-frames-pct').textContent = pct + '%';
+          document.getElementById('render-frames-label').textContent = `Frame ${curr} de ${total}`;
+        }
+        return; // não exibe no terminal (muito verboso)
+      }
+
       const el = document.createElement('div');
       el.className = 'log-line';
       if (clean.includes('✅')||clean.includes('concluído')||clean.includes('pronto')) el.style.color='#4ade80';
@@ -887,7 +1045,7 @@
 
     function resetApp() {
       if (eventSource) eventSource.close();
-      currentJobId=null; selectedFile=null; currentFormat='vertical';
+      currentJobId=null; selectedFiles=[]; selectedImages=[]; currentFormat='vertical';
       document.getElementById('progress-section').classList.add('hidden');
       document.getElementById('upload-section').classList.remove('hidden');
       const btn = document.getElementById('upload-btn');
@@ -896,6 +1054,17 @@
       document.getElementById('drop-selected').classList.add('hidden');
       document.getElementById('log-container').innerHTML='';
       document.getElementById('result-card').classList.add('hidden');
+      document.getElementById('refine-card').classList.add('hidden');
+      document.getElementById('render-progress-wrap').classList.add('hidden');
+      document.getElementById('render-frames-bar').style.width = '0%';
+      document.getElementById('render-frames-pct').textContent = '0%';
+      document.getElementById('video-list').classList.add('hidden');
+      document.getElementById('image-list').innerHTML = '';
+      document.getElementById('image-label').textContent = 'Adicionar imagens (logo, capa, overlay…)';
+      document.getElementById('image-label').style.color = '#555';
+      document.getElementById('upload-progress-wrap').classList.add('hidden');
+      document.getElementById('upload-bar').style.width = '0%';
+      document.getElementById('refine-instructions').value = '';
       const rb = document.getElementById('render-btn');
       rb.classList.add('hidden'); rb.disabled=false; rb.textContent='Renderizar Vídeo Final';
       document.getElementById('download-btn').style.display='none';
