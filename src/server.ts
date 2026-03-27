@@ -156,6 +156,8 @@ app.post('/api/render/:jobId', async (req, res) => {
         composition,
         outputFile,
         `--props=${propsFile}`,
+        '--timeout=90000',    // 90s por frame (padrão 33s é pouco no Railway)
+        '--concurrency=1',    // 1 thread — economiza RAM no servidor
       ], { cwd: path.join(__dirname, '..'), shell: true });
 
       proc.stdout.on('data', (d) => {
