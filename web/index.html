@@ -580,9 +580,15 @@
         </div>
       </div>
 
-      <!-- Terminal -->
-      <div class="terminal mb-4">
+      <!-- Terminal (oculto) -->
+      <div style="display:none">
         <div id="log-container"></div>
+      </div>
+
+      <!-- Frase de Napoleon Hill -->
+      <div id="napoleon-card" class="card p-5 mb-4" style="display:none;text-align:center">
+        <div style="font-size:11px;color:#555;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Napoleon Hill</div>
+        <div id="napoleon-quote" style="font-size:14px;color:#aaa;line-height:1.7;font-style:italic;transition:opacity 0.6s"></div>
       </div>
 
       <!-- Result -->
@@ -635,9 +641,12 @@
         Renderizar Vídeo Final
       </button>
       <a id="download-btn" href="#" class="btn-primary text-center block mb-3"
-        style="text-decoration:none;display:none">
+        style="text-decoration:none;display:none" onclick="onDownloadClick(this)">
         Baixar Vídeo Editado
       </a>
+      <div id="download-msg" style="display:none;text-align:center;font-size:13px;color:#4ade80;margin-top:8px;margin-bottom:4px">
+        O vídeo está sendo baixado...
+      </div>
       <button id="new-btn" onclick="resetApp()" class="btn-secondary hidden">
         Editar novo vídeo
       </button>
@@ -790,6 +799,45 @@
     let currentJobId = null, selectedFiles = [], selectedImages = [], eventSource = null, currentFormat = 'vertical';
     let highlightsOn = true;
 
+    // ── Napoleon Hill quotes ──────────────────────────────────
+    const napoleonQuotes = [
+      "Tudo que a mente do homem pode conceber e acreditar, ela pode conquistar.",
+      "O segredo do sucesso está na persistência de propósito.",
+      "A oportunidade não existe sem dificuldade.",
+      "Aja como se o fracasso fosse impossível.",
+      "Não existe fracasso — apenas resultados temporários.",
+      "O sucesso vem para quem está consciente do sucesso.",
+      "Cada adversidade carrega em si a semente de um benefício equivalente.",
+      "A vitória é sempre possível para quem recusa desistir.",
+      "Planeje seu trabalho e trabalhe seu plano.",
+      "A autodisciplina começa com o domínio dos seus pensamentos.",
+    ];
+    let napoleonInterval = null;
+    function startNapoleon() {
+      const card = document.getElementById('napoleon-card');
+      const el = document.getElementById('napoleon-quote');
+      card.style.display = 'block';
+      let i = Math.floor(Math.random() * napoleonQuotes.length);
+      el.textContent = '"' + napoleonQuotes[i] + '"';
+      napoleonInterval = setInterval(() => {
+        el.style.opacity = '0';
+        setTimeout(() => {
+          i = (i + 1) % napoleonQuotes.length;
+          el.textContent = '"' + napoleonQuotes[i] + '"';
+          el.style.opacity = '1';
+        }, 600);
+      }, 6000);
+    }
+    function stopNapoleon() {
+      clearInterval(napoleonInterval);
+      document.getElementById('napoleon-card').style.display = 'none';
+    }
+
+    // ── Download message ──────────────────────────────────────
+    function onDownloadClick(el) {
+      document.getElementById('download-msg').style.display = 'block';
+    }
+
     // ── Advanced controls ──
     const CUT_LABELS = ['','Suave (1)','Leve (2)','Moderado (3)','Agressivo (4)','Máximo (5)'];
     function updateCutLabel(v) {
@@ -920,6 +968,7 @@
           currentJobId = d.jobId;
           document.getElementById('upload-section').classList.add('hidden');
           document.getElementById('progress-section').classList.remove('hidden');
+          startNapoleon();
           connectSSE(d.jobId);
         } catch(e) {
           btn.disabled = false; btn.textContent = 'Iniciar Edição com IA';
@@ -972,12 +1021,14 @@
         document.getElementById('step-label').textContent = 'Vídeo pronto!';
         const dot = document.getElementById('status-dot');
         dot.classList.remove('pulse'); dot.style.background = '#4ade80';
+        stopNapoleon();
         const dl = document.getElementById('download-btn');
         dl.href = `/api/download/${currentJobId}`; dl.style.display = 'block';
         document.getElementById('new-btn').classList.remove('hidden');
         if (eventSource) eventSource.close();
       }
       if (d.status === 'error') {
+        stopNapoleon();
         document.getElementById('step-label').textContent = 'Erro no processamento';
         const dot = document.getElementById('status-dot');
         dot.classList.remove('pulse'); dot.style.background = '#f87171';
