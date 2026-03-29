@@ -9,8 +9,6 @@ import { Outro } from './Outro';
 import { SegmentVideo } from './SegmentVideo';
 import { SoundEffects } from './SoundEffects';
 
-const PLAYBACK_RATE = 1.2; // 20% mais rápido
-
 export interface VideoEditorProps {
   videoSrc: string;
   segments: TranscriptionSegment[];
@@ -28,6 +26,7 @@ export interface VideoEditorProps {
   musicVolume?: number;
   whooshSrc?: string;
   popSrc?: string;
+  videoSpeed?: number;
   [key: string]: unknown;
 }
 
@@ -48,18 +47,18 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
   musicVolume = 0.18,
   whooshSrc,
   popSrc,
+  videoSpeed = 1.2,
 }) => {
   const { fps } = useVideoConfig();
 
   const introFrames = showIntro ? Math.floor(introDurationSeconds * fps) : 0;
   const outroFrames = showOutro ? Math.floor(outroDurationSeconds * fps) : 0;
 
-  // Duração de cada segmento acelerada (1.2x = menos frames de saída)
+  // Duração de cada segmento ajustada pelo videoSpeed vindo das props
   let currentOutputFrame = introFrames;
   const segmentOutputTimes = segments.map((seg, index) => {
     const sourceDuration = seg.end - seg.start;
-    // Com 1.2x: o mesmo conteúdo cabe em sourceDuration / 1.2 segundos
-    const outputDuration = Math.floor((sourceDuration / PLAYBACK_RATE) * fps);
+    const outputDuration = Math.floor((sourceDuration / videoSpeed) * fps);
     const entry = {
       seg,
       outputStart: currentOutputFrame,
@@ -122,7 +121,7 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({
             startFrom={sourceStartFrame}
             durationInFrames={duration}
             index={index}
-            playbackRate={PLAYBACK_RATE}
+            playbackRate={videoSpeed}
           />
         </Sequence>
       ))}

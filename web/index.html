@@ -411,12 +411,45 @@
           <div id="image-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
         </div>
 
-        <!-- Instruções para a IA -->
-        <div class="mb-5">
-          <label class="rlabel block mb-2">Instruções para a IA</label>
-          <textarea id="context" class="field" rows="3"
-            placeholder="Ex: remova pausas longas, adicione legendas em amarelo, use música lo-fi, foco nos momentos mais impactantes, tom profissional..."
-            style="resize:vertical;min-height:72px;line-height:1.5"></textarea>
+        <!-- Perguntas guiadas para a IA -->
+        <div class="mb-5" style="display:flex;flex-direction:column;gap:12px">
+          <div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px">Guie a edição</div>
+
+          <div>
+            <label class="rlabel block mb-2">Qual é o objetivo do vídeo?</label>
+            <select id="guide-objetivo" class="field" style="font-size:13px;padding:10px 12px">
+              <option value="">Não especificado</option>
+              <option value="vender um produto ou serviço">Vender produto/serviço</option>
+              <option value="informar e educar o público">Informar / Educar</option>
+              <option value="entreter e engajar">Entreter / Engajar</option>
+              <option value="inspirar e motivar">Inspirar / Motivar</option>
+              <option value="gerar autoridade e credibilidade">Gerar autoridade</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="rlabel block mb-2">O que deve ser priorizado no corte?</label>
+            <select id="guide-corte" class="field" style="font-size:13px;padding:10px 12px">
+              <option value="remova apenas silêncios longos acima de 2 segundos">Só silêncios longos (corte suave)</option>
+              <option value="remova silêncios, hesitações (é..., hmm, né) e repetições">Silêncios + hesitações (moderado)</option>
+              <option value="corte agressivo: mantenha apenas os momentos de alto valor e impacto">Corte agressivo — só o essencial</option>
+              <option value="não faça cortes, apenas organize as legendas">Sem cortes</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="rlabel block mb-2">Há alguma parte específica para manter ou remover?</label>
+            <textarea id="guide-partes" class="field" rows="2"
+              placeholder="Ex: 'mantenha a parte onde falo sobre preço', 'remova a introdução longa'..."
+              style="resize:vertical;min-height:56px;line-height:1.5;font-size:13px"></textarea>
+          </div>
+
+          <div>
+            <label class="rlabel block mb-2">Instruções adicionais livres</label>
+            <textarea id="context" class="field" rows="2"
+              placeholder="Qualquer detalhe extra: tom, ritmo, destaques, música, legendas..."
+              style="resize:vertical;min-height:56px;line-height:1.5;font-size:13px"></textarea>
+          </div>
         </div>
 
         <!-- Ajustes avançados -->
@@ -940,7 +973,16 @@
       selectedFiles.forEach(f => fd.append('video', f));
       selectedImages.forEach(f => fd.append('images', f));
       fd.append('platform', document.getElementById('platform').value);
-      fd.append('context', document.getElementById('context').value);
+      const guideObjetivo = document.getElementById('guide-objetivo').value;
+      const guideCorte = document.getElementById('guide-corte').value;
+      const guidePartes = document.getElementById('guide-partes').value.trim();
+      const contextExtra = document.getElementById('context').value.trim();
+      const contextParts = [];
+      if (guideObjetivo) contextParts.push(`OBJETIVO DO VÍDEO: ${guideObjetivo}.`);
+      if (guideCorte) contextParts.push(`INSTRUÇÃO DE CORTE: ${guideCorte}.`);
+      if (guidePartes) contextParts.push(`PARTES ESPECÍFICAS: ${guidePartes}.`);
+      if (contextExtra) contextParts.push(`INSTRUÇÃO ADICIONAL: ${contextExtra}.`);
+      fd.append('context', contextParts.join(' '));
       fd.append('cutAggressiveness', document.getElementById('cut-aggressiveness').value);
       fd.append('videoSpeed', document.getElementById('video-speed').value);
       fd.append('musicVolume', document.getElementById('music-volume').value);

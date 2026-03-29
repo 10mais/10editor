@@ -5,7 +5,7 @@ import { CaptionStyle } from '../ai-editor';
 
 interface CaptionProps {
   segments: TranscriptionSegment[];
-  segmentOutputTimes: Array<{ seg: TranscriptionSegment; outputStart: number }>;
+  segmentOutputTimes: Array<{ seg: TranscriptionSegment; outputStart: number; duration: number }>;
   style: CaptionStyle;
   highlights: TranscriptionSegment[];
   segmentIndex?: number;
@@ -37,8 +37,7 @@ export const Caption: React.FC<CaptionProps> = ({
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const activeEntry = segmentOutputTimes.find(({ seg, outputStart }) => {
-    const duration = Math.floor((seg.end - seg.start) * fps);
+  const activeEntry = segmentOutputTimes.find(({ outputStart, duration }) => {
     return frame >= outputStart && frame < outputStart + duration;
   });
 
