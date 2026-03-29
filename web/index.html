@@ -1002,8 +1002,8 @@
       const clean = line.replace(/\x1b\[[0-9;]*m/g,'').trim();
       if (!clean) return;
 
-      // Parse progresso do Remotion: "Rendering frames  90/900" ou "Encoded video 176/1385"
-      const renderMatch = clean.match(/(?:Rendering frames|Encoded video)\s+(\d+)\/(\d+)/i);
+      // Parse progresso do Remotion: "Rendering frames  90/900", "Rendered 268/998" ou "Encoded video 176/1385"
+      const renderMatch = clean.match(/(?:Rendering frames|Rendered|Encoded video)\s+(\d+)\/(\d+)/i);
       if (renderMatch) {
         const curr = parseInt(renderMatch[1]), total = parseInt(renderMatch[2]);
         if (total > 0) {
